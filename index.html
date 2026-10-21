@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#062821">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bitácora">
+<meta name="format-detection" content="telephone=no">
+<title>Bitácora de Agua</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="locked">
+
+<!-- ===================== PANTALLA DE BLOQUEO ===================== -->
+<div id="lock" class="lock">
+  <div class="lock-card">
+    <div class="lock-brand">
+      <img src="icons/icon-192.png" alt="" width="44" height="44">
+      <div><h1>Bitácora de Agua</h1><p>Medidores · Calidad de agua · Sedimentación</p></div>
+    </div>
+
+    <form id="lkSetup" class="lk hidden" autocomplete="off">
+      <h2>Crea una contraseña</h2>
+      <p class="sub">La información se guardará <b>cifrada</b> en este dispositivo y solo se podrá abrir con esta contraseña. Usa al menos 8 caracteres; una frase corta es más segura y fácil de recordar.</p>
+      <label for="lkP1">Contraseña</label>
+      <input type="password" id="lkP1" class="inp" autocomplete="new-password">
+      <label for="lkP2">Confirmar contraseña</label>
+      <input type="password" id="lkP2" class="inp" autocomplete="new-password">
+      <div id="lkSetupErr" class="lk-err hidden"></div>
+      <button type="submit" class="btn primary">Crear contraseña</button>
+    </form>
+
+    <div id="lkCodigo" class="lk hidden">
+      <h2>Guarda tu código de recuperación</h2>
+      <p class="sub">Es la <b>única</b> forma de recuperar la información si olvidas la contraseña. Anótalo en papel y guárdalo en un lugar seguro. No se volverá a mostrar.</p>
+      <div id="lkCodigoTxt" class="codigo"></div>
+      <label class="chk"><input type="checkbox" id="lkCodigoOk"> Ya lo anoté en un lugar seguro</label>
+      <button type="button" class="btn primary" id="lkCodigoBtn" disabled>Continuar</button>
+    </div>
+
+    <form id="lkUnlock" class="lk hidden" autocomplete="off">
+      <h2>Ingresa tu contraseña</h2>
+      <label for="lkPass" class="sr">Contraseña</label>
+      <input type="password" id="lkPass" class="inp" autocomplete="current-password" placeholder="Contraseña">
+      <div id="lkUnlockErr" class="lk-err hidden"></div>
+      <button type="submit" class="btn primary">Desbloquear</button>
+      <button type="button" class="link" id="lkOlvide">¿Olvidaste la contraseña?</button>
+    </form>
+
+    <form id="lkRecover" class="lk hidden" autocomplete="off">
+      <h2>Recuperar acceso</h2>
+      <p class="sub">Escribe tu código de recuperación y elige una contraseña nueva.</p>
+      <label for="lkCod">Código de recuperación</label>
+      <input id="lkCod" class="inp mono" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX">
+      <label for="lkN1">Nueva contraseña</label>
+      <input type="password" id="lkN1" class="inp" autocomplete="new-password">
+      <label for="lkN2">Confirmar nueva contraseña</label>
+      <input type="password" id="lkN2" class="inp" autocomplete="new-password">
+      <div id="lkRecErr" class="lk-err hidden"></div>
+      <button type="submit" class="btn primary">Restablecer contraseña</button>
+      <button type="button" class="link" id="lkVolver">Volver</button>
+    </form>
+
+    <div id="lkNoDisp" class="lk hidden">
+      <h2>No se puede abrir de forma segura</h2>
+      <p class="sub">El cifrado necesita que la app se abra desde una dirección segura (https://). Ábrela desde el enlace publicado.</p>
+    </div>
+
+    <p class="lock-foot">Los datos se guardan cifrados solo en este dispositivo. No se envían a ningún servidor.</p>
+  </div>
+</div>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2.5c3.6 4.3 6.5 8 6.5 11.4A6.5 6.5 0 0 1 5.5 13.9C5.5 10.5 8.4 6.8 12 2.5Z" fill="#08312A"/><path d="M9 14.5a3 3 0 0 0 3 3" stroke="#00E47C" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h1>Bitácora de Agua</h1>
+        <p>Sistema de bitácora · Calidad de agua</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="captura" role="tab"><svg class="ic-tab" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span>Captura<span class="lg"> diaria</span></span></button>
+      <button class="tab" data-tab="historial" role="tab"><svg class="ic-tab" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Historial</span></button>
+      <button class="tab" data-tab="graficas" role="tab"><svg class="ic-tab" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Gráficas<span class="lg"> y tendencias</span></span></button>
+      <button class="tab" data-tab="respaldo" role="tab"><svg class="ic-tab" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Respaldo<span class="lg"> y seguridad</span></span><span id="backupDot" class="dot hidden" title="Hace tiempo que no descargas un respaldo"></span></button>
+      <button class="tab lock-btn" id="btnBloquear" title="Bloquear ahora" aria-label="Bloquear ahora"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div id="storageWarn" class="notice err hidden">No se pudo guardar en este dispositivo (modo privado, almacenamiento lleno o bloqueado). Descarga un respaldo para no perder información.</div>
+  <div id="avisoUpdate" class="notice ok hidden">
+    <span>Hay una versión nueva de la bitácora.</span>
+    <button class="btn sm primary" id="btnUpdate">Actualizar</button>
+  </div>
+
+  <!-- ===================== CAPTURA ===================== -->
+  <section id="tab-captura" class="panel active">
+    <div class="card head-card">
+      <div class="fld date-field">
+        <label for="fecha">Fecha del registro</label>
+        <input type="date" id="fecha" class="inp">
+      </div>
+      <div class="date-info">
+        <div id="fechaLarga" class="date-long"></div>
+        <div id="estado" class="status"></div>
+      </div>
+      <div class="head-actions">
+        <button class="btn ghost" id="btnPrev" title="Día hábil anterior">‹ Anterior</button>
+        <button class="btn ghost" id="btnHoy">Hoy</button>
+        <button class="btn ghost" id="btnNext" title="Siguiente día hábil">Siguiente ›</button>
+      </div>
+      <div class="head-meta">
+        <div class="fld">
+          <label for="f-folio">Folio / Referencia</label>
+          <input id="f-folio" class="inp" data-f="folio" autocomplete="off" autocapitalize="characters" placeholder="Ej. folio de la bitácora física">
+          <small>Como se indica en la bitácora física</small>
+        </div>
+        <div class="fld">
+          <label for="f-resp">Analista / Responsable</label>
+          <input id="f-resp" class="inp" data-f="responsable" autocomplete="off" placeholder="Nombre de quien registra">
+          <small>Buenas prácticas de documentación</small>
+        </div>
+      </div>
+    </div>
+
+    <div id="avisoBorrador" class="notice hidden">
+      <span>Esta fecha tiene cambios capturados que aún no se guardan.</span>
+      <button class="btn sm" id="btnDescartar">Descartar cambios</button>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="num">1</span><div><h2>Medidores de agua</h2><p>Lectura de cada medidor en m³</p></div></div>
+      <div class="meters" id="meters"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="num">2</span><div><h2>Calidad de agua en muestras</h2>
+        <p>pH entre 6.0 y 9.0 · Temperatura máxima 35 °C · Si no hay dato escribe <span class="kbd">ND</span> (No Disponible) o <span class="kbd">NL</span> (No Laborable)</p></div></div>
+      <div class="table-wrap"><table class="samples" id="samples"></table></div>
+      <div class="samples-foot">
+        <button type="button" class="btn" id="btnAddMuestra">+ Agregar muestra</button>
+        <span class="sub" id="muestrasInfo"></span>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-h"><span class="num">3</span><div><h2>Prueba de sedimentación</h2><p>1 muestra</p></div></div>
+        <div class="sed-wrap">
+          <label for="f-sed">Volumen de sedimentación a 30 min</label>
+          <div class="input-unit"><input id="f-sed" class="inp" data-f="sedimentacion" data-kind="sed" inputmode="decimal" autocomplete="off"><span>mL/L</span></div>
+          <div class="quick"><button type="button" class="chip" data-fill="N/D">N/D</button><button type="button" class="chip" data-fill="N/L">N/L</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="num">4</span><div><h2>Observaciones</h2><p>Opcional, recomendado para buenas prácticas</p></div></div>
+        <div class="fld">
+          <label for="f-obs" class="sr">Observaciones</label>
+          <textarea id="f-obs" class="inp" data-f="observaciones" rows="3" placeholder="Incidencias, calibración de equipos, mantenimiento o eventos relevantes…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Alertas</h3>
+      <ul class="alerts" id="alertList"></ul>
+    </div>
+
+    <div class="savebar">
+      <div class="sum" id="saveSum"></div>
+      <div class="actions">
+        <button class="btn" id="btnXlsxDia" title="Exportar este día a Excel">Excel</button>
+        <button class="btn" id="btnPdfDia" title="Exportar este día a PDF">PDF</button>
+        <span class="sep"></span>
+        <button class="btn primary" id="btnGuardar">Guardar registro</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== HISTORIAL ===================== -->
+  <section id="tab-historial" class="panel">
+    <div class="card">
+      <div class="filters">
+        <div class="fld"><label for="hDesde">Desde</label><input type="date" id="hDesde" class="inp"></div>
+        <div class="fld"><label for="hHasta">Hasta</label><input type="date" id="hHasta" class="inp"></div>
+        <div class="fld"><label for="hMes">Mes</label><input type="month" id="hMes" class="inp"></div>
+        <div class="presets">
+          <button class="btn sm ghost" data-preset="mes">Este mes</button>
+          <button class="btn sm ghost" data-preset="mesant">Mes anterior</button>
+          <button class="btn sm ghost" data-preset="7">Últimos 7 días</button>
+          <button class="btn sm ghost" data-preset="todo">Todo</button>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn" id="btnXlsxRango">Exportar Excel</button>
+          <button class="btn" id="btnPdfRango">Exportar PDF</button>
+        </div>
+      </div>
+      <div class="stats" id="hStats"></div>
+      <div class="missing" id="hMissing"></div>
+    </div>
+    <div class="card" style="padding:6px 8px">
+      <div class="table-wrap">
+        <table class="hist" id="hTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== GRÁFICAS ===================== -->
+  <section id="tab-graficas" class="panel">
+    <div class="card">
+      <div class="filters">
+        <div class="fld"><label for="gDesde">Desde</label><input type="date" id="gDesde" class="inp"></div>
+        <div class="fld"><label for="gHasta">Hasta</label><input type="date" id="gHasta" class="inp"></div>
+        <div class="presets">
+          <button class="btn sm ghost" data-gpreset="mes">Este mes</button>
+          <button class="btn sm ghost" data-gpreset="30">Últimos 30 días</button>
+          <button class="btn sm ghost" data-gpreset="90">Últimos 90 días</button>
+          <button class="btn sm ghost" data-gpreset="todo">Todo</button>
+        </div>
+      </div>
+      <p class="sub" id="gResumen" style="margin-top:10px"></p>
+    </div>
+    <div class="metrics" id="gMetricas"></div>
+    <div id="gVacio" class="card g-empty hidden">No hay registros en el periodo seleccionado.</div>
+    <div class="charts" id="gCharts">
+      <div class="card chart-card"><div class="chart-h"><h3>Tendencia de pH vs límites de control</h3><p>Promedio diario · Límites 6.0 y 9.0 · Punto rojo: alguna muestra del día fuera de rango</p></div><div class="chart-box"><canvas id="chPh"></canvas></div></div>
+      <div class="card chart-card"><div class="chart-h"><h3>Tendencia de temperatura (°C)</h3><p>Promedio diario · Límite máximo 35 °C · Punto rojo: alguna muestra sobre el límite</p></div><div class="chart-box"><canvas id="chTemp"></canvas></div></div>
+      <div class="card chart-card"><div class="chart-h"><h3>Comportamiento de SST y DQO</h3><p>Promedio diario en mg/L</p></div><div class="chart-box"><canvas id="chSstDqo"></canvas></div></div>
+      <div class="card chart-card"><div class="chart-h"><h3>Consumo diario de medidores (m³)</h3><p>Diferencia contra la lectura anterior · Medidores 21, 22, 23 y 25</p></div><div class="chart-box"><canvas id="chMed"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- ===================== RESPALDO ===================== -->
+  <section id="tab-respaldo" class="panel">
+    <div class="two">
+      <div class="card">
+        <h3>Respaldo de la información</h3>
+        <p class="sub" style="font-size:14px">Los registros se guardan <b>cifrados en este dispositivo</b> y no se envían a ningún servidor. Si se borra la app o se pierde el equipo, se pierden. Descarga un respaldo con frecuencia (por ejemplo, cada viernes) y guárdalo en una ubicación autorizada.</p>
+        <div class="stats" id="bStats"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+          <button class="btn primary" id="btnBackup">Descargar respaldo cifrado</button>
+          <button class="btn" id="btnRestore">Restaurar desde respaldo…</button>
+          <input type="file" id="fileRestore" accept=".json,application/json" class="hidden">
+        </div>
+      </div>
+      <div class="card">
+        <h3>Seguridad</h3>
+        <p class="sub" style="font-size:14px">La bitácora se bloquea sola tras 5 minutos sin uso o si queda más de 2 minutos en segundo plano. Para entrar se pide la contraseña.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn" id="btnCambiarPass">Cambiar contraseña</button>
+          <button class="btn" id="btnNuevoCodigo">Nuevo código de recuperación</button>
+          <button class="btn ghost" id="btnBloquear2">Bloquear ahora</button>
+        </div>
+      </div>
+    </div>
+    <div class="card help">
+        <h3>Cómo usar la bitácora</h3>
+        <ul>
+          <li>La fecha toma el día actual. Usa <b>‹ Anterior / Siguiente ›</b> para moverte entre días hábiles.</li>
+          <li>Cada registro nuevo tiene <b>7 muestras</b>. Si necesitas más, usa <b>+ Agregar muestra</b> (hasta 20); la muestra extra se puede quitar con <b>Quitar</b>. Los registros guardados conservan su número de muestras.</li>
+          <li>Todas las lecturas son obligatorias. Si un dato no existe escribe <span class="kbd">ND</span> (No Disponible) o <span class="kbd">NL</span> (No Laborable), o usa los botones junto a cada campo.</li>
+          <li>Los valores fuera de rango se marcan en ámbar y se listan en <b>Alertas</b>; puedes guardarlos confirmando.</li>
+          <li><span class="kbd">Enter</span> pasa al siguiente campo; con teclado físico <span class="kbd">Ctrl/⌘ + S</span> guarda.</li>
+          <li>Los archivos de Excel y PDF <b>no van cifrados</b>: guárdalos solo en ubicaciones autorizadas y no los envíes por canales personales.</li>
+          <li>Para corregir un día guardado, ábrelo desde <b>Historial</b>; al guardar se pide el motivo del cambio y queda registrado.</li>
+          <li>Lo que captures sin guardar se conserva como borrador (cifrado) aunque cierres la app.</li>
+        </ul>
+    </div>
+  </section>
+  <div style="height:24px"></div>
+</main>
+
+<dialog id="dlg">
+  <form class="dlg" id="dlgForm">
+    <h3 id="dlgTitle"></h3>
+    <div class="dlg-body" id="dlgBody"></div>
+    <div id="dlgInputWrap" class="dlg-inputs hidden"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn ghost" id="dlgCancel">Cancelar</button>
+      <button type="button" class="btn primary" id="dlgOk">Aceptar</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="vendor/chart.umd.min.js"></script>
+<script src="seguridad.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
