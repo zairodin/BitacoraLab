@@ -368,3 +368,17 @@ body.locked > header,body.locked > main,body.locked .toast{display:none}
   .meters{grid-template-columns:minmax(0,1fr)}
   .samples tbody th{white-space:normal}
 }
+
+/* ===================== Correcciones para Safari en iPhone/iPad ===================== */
+/* Safari da a los campos de fecha un ancho mínimo propio y los saca de su recuadro */
+input[type=date].inp,input[type=month].inp{
+  -webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;max-width:100%;
+  min-height:44px;text-align:left;line-height:1.3}
+input[type=date].inp::-webkit-date-and-time-value,input[type=month].inp::-webkit-date-and-time-value{text-align:left;margin:0}
+.fld,.filters .fld,.head-card > *{min-width:0}
+@media (max-width:600px){
+  .filters .fld{flex:1 1 0}
+  .filters .fld:has(#hMes){flex-basis:100%}
+  /* iOS difumina el borde superior de la pantalla: más espacio para que el título quede nítido */
+  .top{padding-top:calc(20px + env(safe-area-inset-top))}
+}
