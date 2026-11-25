@@ -5,7 +5,7 @@
  * Solo maneja los archivos del programa; los registros nunca pasan por aquí.
  * Al publicar una versión nueva, cambia VERSION para que los dispositivos la descarguen.
  */
-const VERSION = 'bitacora-2026-10-21-8';
+const VERSION = 'bitacora-2026-11-24-1';
 const ARCHIVOS = [
   './',
   './index.html',

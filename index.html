@@ -149,7 +149,7 @@
 
     <div class="card">
       <div class="card-h"><span class="num">2</span><div><h2>Calidad de agua en muestras</h2>
-        <p>pH entre 6.0 y 9.0 · Temperatura máxima 35 °C · Si no hay dato escribe <span class="kbd">ND</span> (No Disponible) o <span class="kbd">NL</span> (No Laborable)</p></div></div>
+        <p>pH entre 6.0 y 9.0 · Temperatura máxima 35 °C · Muestra 7: SST ≤ 42 y DQO ≤ 84 mg/L · Si no hay dato escribe <span class="kbd">ND</span> (No Disponible) o <span class="kbd">NL</span> (No Laborable)</p></div></div>
       <div class="table-wrap"><table class="samples" id="samples"></table></div>
       <div class="samples-foot">
         <button type="button" class="btn" id="btnAddMuestra">+ Agregar muestra</button>
@@ -239,8 +239,9 @@
     <div class="charts" id="gCharts">
       <div class="card chart-card"><div class="chart-h"><h3>Tendencia de pH vs límites de control</h3><p>Promedio diario · Límites 6.0 y 9.0 · Punto rojo: alguna muestra del día fuera de rango</p></div><div class="chart-box"><canvas id="chPh"></canvas></div></div>
       <div class="card chart-card"><div class="chart-h"><h3>Tendencia de temperatura (°C)</h3><p>Promedio diario · Límite máximo 35 °C · Punto rojo: alguna muestra sobre el límite</p></div><div class="chart-box"><canvas id="chTemp"></canvas></div></div>
-      <div class="card chart-card"><div class="chart-h"><h3>Comportamiento de SST y DQO</h3><p>Promedio diario en mg/L</p></div><div class="chart-box"><canvas id="chSstDqo"></canvas></div></div>
-      <div class="card chart-card"><div class="chart-h"><h3>Consumo diario de medidores (m³)</h3><p>Diferencia contra la lectura anterior · Medidores 21, 22, 23 y 25</p></div><div class="chart-box"><canvas id="chMed"></canvas></div></div>
+      <div class="card chart-card"><div class="chart-h"><h3>Sólidos suspendidos totales (SST)</h3><p>Barras: promedio diario de todas las muestras · Línea: muestra 7 contra su límite de 42 mg/L</p></div><div class="chart-box"><canvas id="chSst"></canvas></div></div>
+      <div class="card chart-card"><div class="chart-h"><h3>Demanda química de oxígeno (DQO)</h3><p>Barras: promedio diario de todas las muestras · Línea: muestra 7 contra su límite de 84 mg/L</p></div><div class="chart-box"><canvas id="chDqo"></canvas></div></div>
+      <div class="card chart-card wide"><div class="chart-h"><h3>Consumo diario de medidores (m³)</h3><p>Diferencia contra la lectura anterior · 21 CONAGUA, 22 Entrada PTAR, 23 Estacionamiento, 25 Riego y 05 Ósmosis</p></div><div class="chart-box"><canvas id="chMed"></canvas></div></div>
     </div>
   </section>
 

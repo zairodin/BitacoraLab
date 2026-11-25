@@ -4,11 +4,18 @@
 // N_MUESTRAS: muestras por defecto en un registro nuevo; MAX_MUESTRAS: tope al agregar muestras extra
 const CFG = { PH_MIN: 6.0, PH_MAX: 9.0, T_MAX: 35, SED_MAX: 1000, N_MUESTRAS: 7, MAX_MUESTRAS: 20, DIAS_RESPALDO: 7 };
 const MEDIDORES = [
-  { k: 'm21', label: 'Medidor 21' },
-  { k: 'm22', label: 'Medidor 22' },
-  { k: 'm23', label: 'Medidor 23' },
-  { k: 'm25', label: 'Medidor 25' },
+  { k: 'm21', label: 'Medidor 21', nombre: 'CONAGUA' },
+  { k: 'm22', label: 'Medidor 22', nombre: 'Entrada PTAR' },
+  { k: 'm23', label: 'Medidor 23', nombre: 'Estacionamiento' },
+  { k: 'm25', label: 'Medidor 25', nombre: 'Riego' },
+  { k: 'm05', label: 'Medidor 05', nombre: 'Ósmosis' },
 ];
+const medTitulo = m => `${m.label} · ${m.nombre}`;
+// Punto de muestreo de cada muestra (por número). La muestra 7 y las extras no tienen nombre asignado.
+const NOMBRES_MUESTRA = ['Influente', 'Homogenización', 'Preaireación', 'Aerobio', 'Sedimentador secundario', 'Efluente'];
+const muestraTitulo = i => `Muestra ${i + 1}` + (NOMBRES_MUESTRA[i] ? ` · ${NOMBRES_MUESTRA[i]}` : '');
+// Límites de SST y DQO que aplican SOLO a una muestra (la 7, índice 6); el resto no tiene límite.
+const MUESTRA_LIMITES = { indice: 6, sst: 42, dqo: 84 };
 const PARAMS = [
   { k: 'ph',   label: 'pH',          unit: '' },
   { k: 'temp', label: 'Temperatura', unit: '°C' },
@@ -82,7 +89,7 @@ function emptyForm(n = CFG.N_MUESTRAS) {
 /* Cada registro conserva su propio número de muestras (los antiguos pueden tener 6). */
 function pickForm(rec) {
   const f = emptyForm(Math.max(1, rec.muestras?.length || CFG.N_MUESTRAS));
-  MEDIDORES.forEach(m => f.medidores[m.k] = rec.medidores?.[m.k] ?? '');
+  MEDIDORES.forEach(m => f.medidores[m.k] = rec.medidores?.[m.k] ?? (rec.fecha ? 'N/D' : ''));
   f.muestras.forEach((mu, i) => PARAMS.forEach(p => mu[p.k] = rec.muestras?.[i]?.[p.k] ?? ''));
   f.sedimentacion = rec.sedimentacion ?? '';
   f.folio = rec.folio ?? '';
@@ -103,8 +110,8 @@ function getPath(o, p) { return p.split('.').reduce((a, k) => a?.[k], o); }
 function setPath(o, p, v) { const ks = p.split('.'); const last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; }
 function kindOf(p) { if (p.startsWith('medidores.')) return 'med'; if (p === 'sedimentacion') return 'sed'; return p.split('.')[2]; }
 function fieldLabel(p) {
-  if (p.startsWith('medidores.')) return MEDIDORES.find(m => `medidores.${m.k}` === p).label;
-  if (p.startsWith('muestras.')) { const [, i, k] = p.split('.'); return `Muestra ${+i + 1} · ${PARAMS.find(x => x.k === k).label}`; }
+  if (p.startsWith('medidores.')) return medTitulo(MEDIDORES.find(m => `medidores.${m.k}` === p));
+  if (p.startsWith('muestras.')) { const [, i, k] = p.split('.'); return `${muestraTitulo(+i)} · ${PARAMS.find(x => x.k === k).label}`; }
   return { sedimentacion: 'Sedimentación 30 min', folio: 'Folio', responsable: 'Analista', observaciones: 'Observaciones' }[p];
 }
 function cleanForm(f) {
@@ -139,6 +146,7 @@ function checkField(kind, v, ctx) {
       break;
     case 'sst': case 'dqo':
       if (n < 0) return { s: 'warn', msg: `${v} mg/L es un valor negativo` };
+      if (ctx?.max != null && n > ctx.max) return { s: 'warn', msg: `${v} mg/L excede el límite de la muestra ${ctx.muestra} (0 a ${ctx.max} mg/L)` };
       break;
     case 'sed':
       if (n < 0) return { s: 'warn', msg: `${v} mL/L es un valor negativo` };
@@ -155,7 +163,12 @@ function validateForm(form, fecha) {
   const byPath = {}, empty = [], invalid = [], warn = [];
   NUM_PATHS(form.muestras.length).forEach(p => {
     const kind = kindOf(p);
-    const ctx = kind === 'med' && fecha ? { prev: prevReading(fecha, p.split('.')[1]) } : null;
+    let ctx = null;
+    if (kind === 'med' && fecha) ctx = { prev: prevReading(fecha, p.split('.')[1]) };
+    if (p.startsWith('muestras.')) {
+      const i = +p.split('.')[1];
+      if (i === MUESTRA_LIMITES.indice && MUESTRA_LIMITES[kind] != null) ctx = { max: MUESTRA_LIMITES[kind], muestra: i + 1 };
+    }
     const r = checkField(kind, normalize(getPath(form, p)), ctx);
     byPath[p] = r;
     const item = { p, label: fieldLabel(p), msg: r.msg, text: `${fieldLabel(p)}: ${r.msg}` };
@@ -172,7 +185,7 @@ function recordChecks(rec) { return validateForm(pickForm(rec), rec.fecha); }
 function buildForm() {
   $('#meters').innerHTML = MEDIDORES.map(m => `
     <div class="meter">
-      <label for="f-${m.k}">${m.label}</label>
+      <label for="f-${m.k}">${m.label} <span class="med-nombre">${m.nombre}</span></label>
       <div class="input-unit"><input id="f-${m.k}" class="inp" data-f="medidores.${m.k}" data-kind="med" inputmode="decimal" autocomplete="off"><span>m³</span></div>
       <div class="quick"><button type="button" class="chip" data-fill="N/D">N/D</button><button type="button" class="chip" data-fill="N/L">N/L</button></div>
       <div class="hint" id="h-${m.k}"></div>
@@ -190,8 +203,9 @@ let minMuestras = CFG.N_MUESTRAS;   // no se pueden quitar filas por debajo de e
 function renderSamples(n) {
   nMuestras = n;
   $('#samples tbody').innerHTML = Array.from({ length: n }, (_, i) => `
-    <tr${i >= CFG.N_MUESTRAS ? ' class="extra"' : ''}><th>Muestra ${i + 1}${i >= CFG.N_MUESTRAS ? ' <span class="tag-extra">extra</span>' : ''}</th>
-      ${PARAMS.map(p => `<td data-label="${p.label}${p.unit ? ` (${p.unit})` : ''}"><input class="inp" data-f="muestras.${i}.${p.k}" data-kind="${p.k}" inputmode="decimal" autocomplete="off" aria-label="Muestra ${i + 1} ${p.label}"></td>`).join('')}
+    <tr${i >= CFG.N_MUESTRAS ? ' class="extra"' : ''}><th>Muestra ${i + 1}${i >= CFG.N_MUESTRAS ? ' <span class="tag-extra">extra</span>' : ''}${NOMBRES_MUESTRA[i] ? `<small class="m-nombre">${NOMBRES_MUESTRA[i]}</small>` : ''}${i === MUESTRA_LIMITES.indice ? `<small class="m-lim">Límites: SST ≤ ${MUESTRA_LIMITES.sst} · DQO ≤ ${MUESTRA_LIMITES.dqo}</small>` : ''}</th>
+      ${PARAMS.map(p => { const lim = i === MUESTRA_LIMITES.indice ? MUESTRA_LIMITES[p.k] : null;
+        return `<td data-label="${p.label}${p.unit ? ` (${p.unit}${lim != null ? `, máx ${lim}` : ''})` : ''}"><input class="inp" data-f="muestras.${i}.${p.k}" data-kind="${p.k}" inputmode="decimal" autocomplete="off" aria-label="${esc(muestraTitulo(i))} ${p.label}"${lim != null ? ` placeholder="0 – ${lim}"` : ''}></td>`; }).join('')}
       <td class="rowfill"><div class="rowq"><button type="button" class="chip" data-rowfill="${i}" data-v="N/D">N/D</button><button type="button" class="chip" data-rowfill="${i}" data-v="N/L">N/L</button>${i === n - 1 && n > minMuestras ? '<button type="button" class="chip quitar" id="btnQuitarMuestra" title="Quitar esta muestra">Quitar</button>' : ''}</div></td>
     </tr>`).join('');
   const extra = Math.max(0, n - CFG.N_MUESTRAS);
@@ -456,13 +470,13 @@ function renderHistory() {
     $('#hTable').innerHTML = `<tbody><tr><td class="empty">${Object.keys(state.registros).length ? 'No hay registros en el periodo seleccionado.' : 'Aún no hay registros guardados. Empieza en <b>Captura diaria</b>.'}</td></tr></tbody>`;
     return;
   }
-  const head = `<thead><tr><th>Fecha</th>${MEDIDORES.map(m => `<th class="n">${m.label.replace('Medidor', 'Med.')} <small style="font-weight:400">m³</small></th>`).join('')}<th class="n">Sed. 30 min</th><th>Alertas</th><th>Analista</th><th></th></tr></thead>`;
+  const head = `<thead><tr><th>Fecha</th>${MEDIDORES.map(m => `<th class="n">${m.label.replace('Medidor', 'Med.')} <small style="font-weight:400">m³</small><small class="th-nombre">${m.nombre}</small></th>`).join('')}<th class="n">Sed. 30 min</th><th>Alertas</th><th>Analista</th><th></th></tr></thead>`;
   const rows = dates.slice().reverse().map(d => {
     const r = state.registros[d], chk = recordChecks(r), w = chk.warn.length;
     const wb = p => chk.byPath[p]?.s === 'warn';
     return `<tr class="row" data-d="${d}">
       <td class="h-fecha"><b>${fmtCorta(d)}</b><small>${diaSemana(d)}${r.folio ? ` · Folio ${esc(r.folio)}` : ''}${r.cambios?.length ? ' · corregido' : ''}</small></td>
-      ${MEDIDORES.map(m => `<td class="n" data-label="${m.label} (m³)">${cellVal(r.medidores[m.k], wb('medidores.' + m.k))}</td>`).join('')}
+      ${MEDIDORES.map(m => `<td class="n" data-label="${medTitulo(m)} (m³)">${cellVal(r.medidores[m.k], wb('medidores.' + m.k))}</td>`).join('')}
       <td class="n" data-label="Sed. 30 min (mL/L)">${cellVal(r.sedimentacion, wb('sedimentacion'))}</td>
       <td class="h-alertas" data-label="Alertas">${w ? `<span class="badge w" title="${esc(chk.warn.map(x => x.text).join('\n'))}">▲ ${w}</span>` : '<span class="badge ok">✓</span>'}</td>
       <td class="h-resp" data-label="Analista">${esc(r.responsable) || '<span style="color:var(--mu)">—</span>'}</td>
@@ -479,7 +493,7 @@ function renderHistory() {
 
 function detailHTML(r, chk) {
   const t = `<table class="mini"><thead><tr><th>Muestra</th>${PARAMS.map(p => `<th>${p.label}${p.unit ? `<br><small>${p.unit}</small>` : ''}</th>`).join('')}</tr></thead><tbody>
-    ${r.muestras.map((mu, i) => `<tr><td>${i + 1}</td>${PARAMS.map(p => `<td>${cellVal(mu[p.k], chk.byPath[`muestras.${i}.${p.k}`]?.s === 'warn')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    ${r.muestras.map((mu, i) => `<tr><td>${i + 1}${NOMBRES_MUESTRA[i] ? ` <small class="m-nombre">${NOMBRES_MUESTRA[i]}</small>` : ''}</td>${PARAMS.map(p => `<td>${cellVal(mu[p.k], chk.byPath[`muestras.${i}.${p.k}`]?.s === 'warn')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   let side = '';
   if (chk.warn.length) side += `<p class="lbl">Alertas</p><ul style="margin:0 0 10px;padding-left:18px;font-size:13px;color:var(--warn)">${chk.warn.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul>`;
   side += `<p><span class="lbl">Folio:</span> ${esc(r.folio) || '—'} · <span class="lbl">Analista:</span> ${esc(r.responsable) || '—'}</p>`;
@@ -525,7 +539,7 @@ function exportXLSX(dates, fileBase) {
   const recs = dates.map(d => state.registros[d]);
   const wb = XLSX.utils.book_new();
 
-  const h1 = ['Fecha', 'Día', 'Folio', ...MEDIDORES.map(m => `${m.label} (m³)`), ...MEDIDORES.map(m => `Consumo ${m.label.replace('Medidor ', 'M')} (m³)`), 'Sedimentación 30 min (mL/L)', 'Analista', 'Observaciones', 'Alertas'];
+  const h1 = ['Fecha', 'Día', 'Folio', ...MEDIDORES.map(m => `${m.label} – ${m.nombre} (m³)`), ...MEDIDORES.map(m => `Consumo ${m.label.replace('Medidor ', 'M')} – ${m.nombre} (m³)`), 'Sedimentación 30 min (mL/L)', 'Analista', 'Observaciones', 'Alertas'];
   const rows1 = recs.map(r => [
     fmtCorta(r.fecha), diaSemana(r.fecha), r.folio || '',
     ...MEDIDORES.map(m => xv(r.medidores[m.k])),
@@ -534,20 +548,20 @@ function exportXLSX(dates, fileBase) {
     recordChecks(r).warn.map(x => x.text).join('; '),
   ]);
   const ws1 = XLSX.utils.aoa_to_sheet([h1, ...rows1]);
-  ws1['!cols'] = [{ wch: 11 }, { wch: 10 }, { wch: 10 }, ...MEDIDORES.map(() => ({ wch: 15 })), ...MEDIDORES.map(() => ({ wch: 15 })), { wch: 18 }, { wch: 22 }, { wch: 34 }, { wch: 60 }];
+  ws1['!cols'] = [{ wch: 11 }, { wch: 10 }, { wch: 10 }, ...MEDIDORES.map(() => ({ wch: 18 })), ...MEDIDORES.map(() => ({ wch: 22 })), { wch: 18 }, { wch: 22 }, { wch: 34 }, { wch: 60 }];
   ws1['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows1.length, c: h1.length - 1 } }) };
   XLSX.utils.book_append_sheet(wb, ws1, 'Medidores y sedimentación');
 
-  const h2 = ['Fecha', 'Muestra', 'pH', 'Temperatura (°C)', 'SST (mg/L)', 'DQO (mg/L)', 'Alertas'];
+  const h2 = ['Fecha', 'Muestra', 'Punto de muestreo', 'pH', 'Temperatura (°C)', 'SST (mg/L)', 'DQO (mg/L)', 'Alertas'];
   const rows2 = recs.flatMap(r => {
     const chk = recordChecks(r);
     return r.muestras.map((mu, i) => [
-      fmtCorta(r.fecha), i + 1, ...PARAMS.map(p => xv(mu[p.k])),
+      fmtCorta(r.fecha), i + 1, NOMBRES_MUESTRA[i] || '', ...PARAMS.map(p => xv(mu[p.k])),
       PARAMS.filter(p => chk.byPath[`muestras.${i}.${p.k}`]?.s === 'warn').map(p => chk.byPath[`muestras.${i}.${p.k}`].msg).join('; '),
     ]);
   });
   const ws2 = XLSX.utils.aoa_to_sheet([h2, ...rows2]);
-  ws2['!cols'] = [{ wch: 11 }, { wch: 9 }, { wch: 8 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 50 }];
+  ws2['!cols'] = [{ wch: 11 }, { wch: 9 }, { wch: 24 }, { wch: 8 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 50 }];
   ws2['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows2.length, c: h2.length - 1 } }) };
   XLSX.utils.book_append_sheet(wb, ws2, 'Calidad de agua');
 
@@ -630,7 +644,7 @@ function exportPDFDia(d) {
     head: [['Medidor', 'Lectura (m³)', 'Lectura anterior (m³)', 'Consumo (m³)']],
     body: MEDIDORES.map(m => {
       const prev = prevReading(d, m.k), c = consumo(r, m.k);
-      return [m.label, pc(r.medidores[m.k], wb('medidores.' + m.k)), pc(prev ? `${fmtNum(prev.n)} (${fmtCorta(prev.fecha)})` : ''), pc(c === '' ? '' : (c >= 0 ? '+' : '') + fmtNum(c))];
+      return [medTitulo(m), pc(r.medidores[m.k], wb('medidores.' + m.k)), pc(prev ? `${fmtNum(prev.n)} (${fmtCorta(prev.fecha)})` : ''), pc(c === '' ? '' : (c >= 0 ? '+' : '') + fmtNum(c))];
     }),
   });
   y = doc.lastAutoTable.finalY + 9;
@@ -638,7 +652,7 @@ function exportPDFDia(d) {
   y = pdfTitle(doc, '2. Calidad de agua en muestras', y);
   doc.autoTable({ ...tableBase, startY: y,
     head: [['Muestra', ...PARAMS.map(p => p.label + (p.unit ? ` (${p.unit})` : ''))]],
-    body: r.muestras.map((mu, i) => [`Muestra ${i + 1}`, ...PARAMS.map(p => pc(mu[p.k], wb(`muestras.${i}.${p.k}`)))]),
+    body: r.muestras.map((mu, i) => [muestraTitulo(i).replace(' · ', ' - '), ...PARAMS.map(p => pc(mu[p.k], wb(`muestras.${i}.${p.k}`)))]),
   });
   y = doc.lastAutoTable.finalY + 9;
 
@@ -688,7 +702,7 @@ function exportPDFRango(dates, label, fileBase) {
 
   y = pdfTitle(doc, 'Medidores de agua y sedimentación', y);
   doc.autoTable({ ...tableBase, startY: y, styles: { ...tableBase.styles, fontSize: 8.5 },
-    head: [['Fecha', 'Día', 'Folio', ...MEDIDORES.map(m => `${m.label} (m³)`), 'Sed. 30 min (mL/L)', 'Alertas', 'Analista']],
+    head: [['Fecha', 'Día', 'Folio', ...MEDIDORES.map(m => `${m.label.replace('Medidor ', 'M-')}\n${m.nombre} (m³)`), 'Sed. 30 min (mL/L)', 'Alertas', 'Analista']],
     body: recs.map(r => {
       const chk = recordChecks(r), wb = p => chk.byPath[p]?.s === 'warn';
       return [fmtCorta(r.fecha), diaSemana(r.fecha), pdfSafe(r.folio) || '-',
@@ -710,7 +724,7 @@ function exportPDFRango(dates, label, fileBase) {
       const chk = recordChecks(r);
       return r.muestras.map((mu, i) => [
         ...(i === 0 ? [{ content: `${fmtCorta(r.fecha)}\n${diaSemana(r.fecha)}`, rowSpan: r.muestras.length, styles: { valign: 'middle', fontStyle: 'bold' } }] : []),
-        String(i + 1), ...PARAMS.map(p => pc(mu[p.k], chk.byPath[`muestras.${i}.${p.k}`]?.s === 'warn'))]);
+        `${i + 1}${NOMBRES_MUESTRA[i] ? ` ${NOMBRES_MUESTRA[i]}` : ''}`, ...PARAMS.map(p => pc(mu[p.k], chk.byPath[`muestras.${i}.${p.k}`]?.s === 'warn'))]);
     }),
   });
   y = doc.lastAutoTable.finalY + 9;
@@ -937,14 +951,20 @@ function renderGraficas() {
   const todos = k => recs.flatMap(r => numeros(r, k));
   const ph = todos('ph'), te = todos('temp'), sst = todos('sst'), dqo = todos('dqo');
   const phFuera = ph.filter(v => v < CFG.PH_MIN || v > CFG.PH_MAX).length, teFuera = te.filter(v => v > CFG.T_MAX).length;
+  // Muestra 7: valores del día y cuántos superan su límite
+  const valorM7 = (r, k) => { const v = r.muestras?.[MUESTRA_LIMITES.indice]?.[k]; return isNum(v) ? Number(v) : null; };
+  const m7Fuera = k => recs.filter(r => { const v = valorM7(r, k); return v != null && v > MUESTRA_LIMITES[k]; }).length;
+  const subM7 = (k, total) => m7Fuera(k)
+    ? `Muestra ${MUESTRA_LIMITES.indice + 1}: ${m7Fuera(k)} día(s) sobre ${MUESTRA_LIMITES[k]}`
+    : `${total} lectura(s) · Muestra ${MUESTRA_LIMITES.indice + 1} ≤ ${MUESTRA_LIMITES[k]}`;
   const tarjeta = (ic, lbl, v, dec, unidad, sub, alerta) => `<div class="metric"><div class="metric-ic" aria-hidden="true">${ic}</div><div>
       <span class="metric-lbl">${lbl}</span><span class="metric-val">${v == null ? '--' : v.toFixed(dec)}${v != null && unidad ? `<small>${unidad}</small>` : ''}</span>
       <span class="metric-sub${alerta ? ' w' : ''}">${sub}</span></div></div>`;
   $('#gMetricas').innerHTML =
     tarjeta('🧪', 'Promedio de pH', promedio(ph), 2, '', phFuera ? `${phFuera} lectura(s) fuera de ${CFG.PH_MIN.toFixed(1)}–${CFG.PH_MAX.toFixed(1)}` : `Rango óptimo: ${CFG.PH_MIN.toFixed(1)} – ${CFG.PH_MAX.toFixed(1)}`, phFuera) +
     tarjeta('🌡️', 'Temp. promedio', promedio(te), 1, '°C', teFuera ? `${teFuera} lectura(s) sobre ${CFG.T_MAX} °C` : `Límite: ≤ ${CFG.T_MAX} °C`, teFuera) +
-    tarjeta('🌫️', 'SST promedio', promedio(sst), 1, 'mg/L', `${sst.length} lectura(s)`) +
-    tarjeta('💧', 'DQO promedio', promedio(dqo), 1, 'mg/L', `${dqo.length} lectura(s)`);
+    tarjeta('🌫️', 'SST promedio', promedio(sst), 1, 'mg/L', subM7('sst', sst.length), m7Fuera('sst')) +
+    tarjeta('💧', 'DQO promedio', promedio(dqo), 1, 'mg/L', subM7('dqo', dqo.length), m7Fuera('dqo'));
 
   Object.values(charts).forEach(c => c.destroy());
   if (!hay || typeof Chart === 'undefined') return;
@@ -988,15 +1008,25 @@ function renderGraficas() {
       pointRadius: radios(teMarca), pointBackgroundColor: puntos(teMarca, C.warn), pointBorderColor: 'transparent' },
     limite(`Límite máximo (${CFG.T_MAX} °C)`, CFG.T_MAX)] } });
 
-  // SST y DQO
-  charts.sstdqo = new Chart($('#chSstDqo'), { type: 'bar', options: opciones({ beginAtZero: true }), data: { labels, datasets: [
-    { label: 'SST promedio (mg/L)', data: recs.map(r => red(promedio(numeros(r, 'sst')), 1)), backgroundColor: 'rgba(56,189,248,.75)', borderRadius: 5 },
-    { label: 'DQO promedio (mg/L)', data: recs.map(r => red(promedio(numeros(r, 'dqo')), 1)), backgroundColor: 'rgba(0,228,124,.75)', borderRadius: 5 }] } });
+  // SST y DQO (gráficas separadas): barras = promedio diario; línea = muestra 7 contra su límite
+  const graficaLimiteM7 = (canvas, k, nombre, colorBarra) => {
+    const lim = MUESTRA_LIMITES[k], num = MUESTRA_LIMITES.indice + 1;
+    const m7 = recs.map(r => valorM7(r, k));
+    const marcas = m7.map(v => v != null && v > lim);
+    return new Chart($(canvas), { type: 'bar', options: opciones({ beginAtZero: true }), data: { labels, datasets: [
+      { type: 'line', label: `Muestra ${num} (mg/L)`, data: m7, order: 0, borderColor: '#f1f7f5', borderWidth: 2, tension: .3, spanGaps: true,
+        pointRadius: radios(marcas), pointBackgroundColor: puntos(marcas, '#f1f7f5'), pointBorderColor: 'transparent', fill: false },
+      { ...limite(`Límite muestra ${num} (${lim} mg/L)`, lim), type: 'line', order: 1 },
+      { label: `${nombre} promedio de todas las muestras (mg/L)`, data: recs.map(r => red(promedio(numeros(r, k)), 1)),
+        backgroundColor: colorBarra, borderRadius: 5, order: 2 }] } });
+  };
+  charts.sst = graficaLimiteM7('#chSst', 'sst', 'SST', 'rgba(56,189,248,.55)');
+  charts.dqo = graficaLimiteM7('#chDqo', 'dqo', 'DQO', 'rgba(0,228,124,.5)');
 
   // Consumo diario de medidores
-  const colores = [C.ac, C.info, C.warn, C.morado];
+  const colores = [C.ac, C.info, C.warn, C.morado, '#f472b6'];
   charts.med = new Chart($('#chMed'), { type: 'bar', options: opciones({}), data: { labels, datasets: MEDIDORES.map((m, i) => ({
-    label: m.label.replace('Medidor ', 'M-'), data: recs.map(r => { const c = consumo(r, m.k); return c === '' ? null : c; }),
+    label: `${m.label.replace('Medidor ', '')} ${m.nombre}`, data: recs.map(r => { const c = consumo(r, m.k); return c === '' ? null : c; }),
     backgroundColor: colores[i % colores.length], borderRadius: 4 })) } });
 }
 function stepWorkday(dir) {
